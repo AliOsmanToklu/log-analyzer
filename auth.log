@@ -1,0 +1,66 @@
+Oct 25 08:00:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 08:06:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.12 port 52000 ssh2
+Oct 25 08:30:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 09:00:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 09:30:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 09:35:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.10 port 52000 ssh2
+Oct 25 09:39:00 server sshd[1234]: Accepted password for ayse from 192.168.1.11 port 52000 ssh2
+Oct 25 09:44:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.11 port 52000 ssh2
+Oct 25 09:54:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.12 port 52000 ssh2
+Oct 25 10:00:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 10:22:00 server sshd[1234]: Accepted password for mehmet from 192.168.1.10 port 52000 ssh2
+Oct 25 10:30:00 server sshd[1234]: Invalid user oracle from 198.51.100.7 port 33000
+Oct 25 10:39:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.11 port 52000 ssh2
+Oct 25 11:00:00 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:03 server sshd[1234]: Failed password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:06 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:09 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:12 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:15 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:18 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:21 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:24 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:27 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:30 server sshd[1234]: Failed password for ubuntu from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:33 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:36 server sshd[1234]: Failed password for ubuntu from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:39 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:42 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:45 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:48 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:51 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:54 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:00:57 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:00 server sshd[1234]: Failed password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:03 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:06 server sshd[1234]: Failed password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:09 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:12 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:15 server sshd[1234]: Failed password for ubuntu from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:18 server sshd[1234]: Failed password for ubuntu from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:21 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:24 server sshd[1234]: Failed password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:27 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:30 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:33 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:36 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:39 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:42 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:45 server sshd[1234]: Failed password for ubuntu from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:48 server sshd[1234]: Failed password for test from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:51 server sshd[1234]: Failed password for root from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:54 server sshd[1234]: Failed password for admin from 203.0.113.45 port 40000 ssh2
+Oct 25 11:01:57 server sshd[1234]: Failed password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 11:02:05 server sshd[1234]: Accepted password for ahmet from 203.0.113.45 port 40000 ssh2
+Oct 25 12:30:00 server sshd[1234]: Failed password for ahmet from 192.168.1.12 port 52000 ssh2
+Oct 25 12:41:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.10 port 52000 ssh2
+Oct 25 13:00:00 server sshd[1234]: Failed password for mehmet from 192.168.1.12 port 52000 ssh2
+Oct 25 14:27:00 server sshd[1234]: Failed password for ahmet from 192.168.1.12 port 52000 ssh2
+Oct 25 15:12:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.10 port 52000 ssh2
+Oct 25 15:12:00 server sshd[1234]: Accepted password for ayse from 192.168.1.11 port 52000 ssh2
+Oct 25 15:39:00 server sshd[1234]: Accepted password for mehmet from 192.168.1.11 port 52000 ssh2
+Oct 25 15:50:00 server sshd[1234]: Failed password for mehmet from 192.168.1.10 port 52000 ssh2
+Oct 25 16:37:00 server sshd[1234]: Accepted password for mehmet from 192.168.1.10 port 52000 ssh2
+Oct 25 17:18:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.12 port 52000 ssh2
+Oct 25 17:18:00 server sshd[1234]: Accepted password for ayse from 192.168.1.10 port 52000 ssh2
+Oct 25 17:34:00 server sshd[1234]: Accepted password for ahmet from 192.168.1.12 port 52000 ssh2

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+
+# Generated reports
+/rapor.csv
+/report.csv
+/report*.csv
+/report*.json
+
+# Real (non-synthetic) log exports - never commit
+/windows_events.csv
+/private/
+*.evtx
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
