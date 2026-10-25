@@ -16,7 +16,9 @@ from .models import Event, Finding, Severity
 @dataclass(frozen=True, slots=True)
 class AnalysisResult:
     total_events: int
+    threshold: int
     window_seconds: int
+    scan_threshold: int
     bruteforce: list[BruteForceSuspect]
     compromises: list[Event]
     scanners: list[ScanSuspect]
@@ -47,7 +49,9 @@ def analyze(
     suspects = detect_bruteforce(events, threshold, window_seconds)
     return AnalysisResult(
         total_events=len(events),
+        threshold=threshold,
         window_seconds=window_seconds,
+        scan_threshold=scan_threshold,
         bruteforce=list(suspects.values()),
         compromises=detect_compromise(events, suspects),
         scanners=list(detect_scanners(events, scan_threshold).values()),

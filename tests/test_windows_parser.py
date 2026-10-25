@@ -2,6 +2,8 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from log_analyzer.models import Event, EventType
 from log_analyzer.parsers.windows import parse_windows_csv
 
@@ -50,6 +52,35 @@ def test_skips_rows_with_bad_timestamps(tmp_path: Path) -> None:
     )
 
     assert [(e.user, e.ip) for e in parse_windows_csv(path)] == [("eve", "203.0.113.5")]
+
+
+def test_accepts_iso_timestamps(tmp_path: Path) -> None:
+    path = write_csv(
+        tmp_path,
+        '"2026-10-25T13:00:00","4625","bob","203.0.113.5"',
+        '"2026-10-25T13:00:01.5+03:00","4625","bob","203.0.113.5"',
+    )
+
+    assert [e.time for e in parse_windows_csv(path)] == [
+        datetime(2026, 10, 25, 13, 0, 0),
+        datetime(2026, 10, 25, 13, 0, 1, 500000),
+    ]
+
+
+def test_missing_columns_raise(tmp_path: Path) -> None:
+    path = tmp_path / "events.csv"
+    path.write_text("Time,Id,Account\n2026-10-25 13:00:00,4625,bob\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"missing column\(s\): User, IP"):
+        parse_windows_csv(path)
+
+
+def test_empty_file_raises(tmp_path: Path) -> None:
+    path = tmp_path / "events.csv"
+    path.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="missing column"):
+        parse_windows_csv(path)
 
 
 def test_sample(windows_sample: Path) -> None:

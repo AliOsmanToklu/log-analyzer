@@ -29,9 +29,10 @@ def test_windows_sample_findings(windows_sample: Path) -> None:
 
 
 def test_thresholds_are_passed_through(ssh_sample: Path) -> None:
-    result = analyze(parse_file(ssh_sample), threshold=22, scan_threshold=7)
+    result = analyze(parse_file(ssh_sample), threshold=22, window_seconds=60, scan_threshold=7)
 
     assert result.findings() == []
+    assert (result.threshold, result.window_seconds, result.scan_threshold) == (22, 60, 7)
 
 
 def test_empty_input() -> None:
