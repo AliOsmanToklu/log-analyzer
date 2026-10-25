@@ -54,6 +54,17 @@ def test_skips_rows_with_bad_timestamps(tmp_path: Path) -> None:
     assert [(e.user, e.ip) for e in parse_windows_csv(path)] == [("eve", "203.0.113.5")]
 
 
+def test_short_rows_do_not_crash(tmp_path: Path) -> None:
+    path = write_csv(
+        tmp_path,
+        '"2026-10-25 13:00:00","4625"',
+        '"2026-10-25 13:00:00"',
+        '"2026-10-25 13:00:00","4625","eve","203.0.113.5"',
+    )
+
+    assert [e.user for e in parse_windows_csv(path)] == ["eve"]
+
+
 def test_accepts_iso_timestamps(tmp_path: Path) -> None:
     path = write_csv(
         tmp_path,
