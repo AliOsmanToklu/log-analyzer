@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "log-analyzer"
+dynamic = ["version"]
+description = "Detect brute force and scanning activity in SSH and Windows logon logs"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ali Osman Toklu" }]
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["security", "log-analysis", "ssh", "brute-force", "windows-events"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+    "Topic :: System :: Logging",
+]
+
+[project.scripts]
+log-analyzer = "log_analyzer.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "log_analyzer.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

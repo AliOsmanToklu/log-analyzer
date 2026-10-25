@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-# Üç tür satırı yakalayan kalıplar
+# Patterns for the three kinds of sshd lines we care about
 PATTERNS = {
     'failed': re.compile(r'Failed password for (?:invalid user )?(\S+) from (\S+)'),
     'accepted': re.compile(r'Accepted password for (\S+) from (\S+)'),
@@ -10,8 +10,8 @@ PATTERNS = {
 
 
 def parse_line(line, year=2026):
-    """Bir log satırını sözlüğe çevirir. Tanınmayan satır için None döner."""
-    time_str = line[:15]  # örn. "Oct 25 11:02:05"
+    """Convert one log line to an event dict. Returns None for unrecognized lines."""
+    time_str = line[:15]  # e.g. "Oct 25 11:02:05"
     try:
         timestamp = datetime.strptime(f"{year} {time_str}", "%Y %b %d %H:%M:%S")
     except ValueError:
@@ -37,10 +37,3 @@ def parse_file(filepath):
             if event:
                 events.append(event)
     return events
-
-
-if __name__ == '__main__':
-    events = parse_file('auth.log')
-    print(f"{len(events)} olay ayrıştırıldı")
-    for e in events[:5]:
-        print(e)

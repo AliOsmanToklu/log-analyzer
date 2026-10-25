@@ -3,7 +3,7 @@ from datetime import timedelta
 
 
 def detect_bruteforce(events, threshold=10, window_seconds=60):
-    """Belirli süre içinde 'threshold' veya daha fazla başarısız deneme yapan IP'leri bulur."""
+    """Find IPs with at least `threshold` failed attempts within the time window."""
     failed_by_ip = defaultdict(list)
     for e in events:
         if e['type'] == 'failed':
@@ -15,7 +15,7 @@ def detect_bruteforce(events, threshold=10, window_seconds=60):
     for ip, attempts in failed_by_ip.items():
         attempts.sort(key=lambda e: e['time'])
 
-        # Kayan pencere (sliding window): pencereye sığan en fazla deneme sayısı
+        # Sliding window: the largest number of attempts that fit in one window
         start = 0
         best = 0
         for end in range(len(attempts)):
@@ -36,7 +36,7 @@ def detect_bruteforce(events, threshold=10, window_seconds=60):
 
 
 def detect_compromise(events, suspects):
-    """Brute force şüphelisi bir IP'nin sonradan başarılı giriş yapıp yapmadığına bakar."""
+    """Check whether a brute force suspect later logged in successfully."""
     compromised = []
     for e in events:
         if e['type'] == 'accepted' and e['ip'] in suspects:
@@ -46,7 +46,7 @@ def detect_compromise(events, suspects):
 
 
 def detect_scanners(events, threshold=3):
-    """Geçersiz kullanıcı adı deneyen (yavaş tarama yapan) IP'leri bulur."""
+    """Find IPs probing non-existent usernames (slow scanning)."""
     invalid_by_ip = defaultdict(list)
     for e in events:
         if e['type'] == 'invalid':
@@ -60,13 +60,3 @@ def detect_scanners(events, threshold=3):
                 'users_tried': sorted({a['user'] for a in attempts}),
             }
     return scanners
-
-
-if __name__ == '__main__':
-    from parser import parse_file
-
-    events = parse_file('auth.log')
-    suspects = detect_bruteforce(events)
-    print("Brute force şüphelileri:", suspects)
-    print("Ele geçirme şüphesi:", detect_compromise(events, suspects))
-    print("Yavaş tarayıcılar:", detect_scanners(events))

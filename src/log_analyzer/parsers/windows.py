@@ -6,12 +6,12 @@ EVENT_TYPES = {
     '4624': 'accepted',
 }
 
-# Yerel/anlamsız adresleri eleriz, uzaktan gelen girişlerle ilgileniyoruz
+# Local/meaningless addresses are dropped; we only care about remote logons
 IGNORED_IPS = {'-', '', '::1', '127.0.0.1'}
 
 
 def parse_windows_csv(filepath):
-    """Time,Id,User,IP sütunlu CSV'yi ortak olay formatına çevirir."""
+    """Convert a CSV with Time,Id,User,IP columns to the common event format."""
     events = []
     with open(filepath, 'r', encoding='utf-8-sig', newline='') as f:
         for row in csv.DictReader(f):
@@ -30,10 +30,3 @@ def parse_windows_csv(filepath):
                 'ip': ip,
             })
     return events
-
-
-if __name__ == '__main__':
-    events = parse_windows_csv('windows_events.csv')
-    print(f"{len(events)} olay ayrıştırıldı")
-    for e in events[:5]:
-        print(e)
