@@ -1,0 +1,33 @@
+# Local stack: the API backed by PostgreSQL.
+#   docker compose up --build
+#   open http://localhost:8000/docs   (API_PORT=8080 docker compose up to use another port)
+# The default password is for local use only; set POSTGRES_PASSWORD to override it.
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: log_analyzer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-log_analyzer}
+      POSTGRES_DB: log_analyzer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U log_analyzer -d log_analyzer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      LOG_ANALYZER_DATABASE_URL: postgresql+psycopg://log_analyzer:${POSTGRES_PASSWORD:-log_analyzer}@db:5432/log_analyzer
+      LOG_ANALYZER_MAX_UPLOAD_MB: "20"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

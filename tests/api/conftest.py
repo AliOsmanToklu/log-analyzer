@@ -1,10 +1,11 @@
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, MetaData
 
 from log_analyzer.api.app import create_app
 from log_analyzer.api.db import make_engine, upgrade
@@ -13,11 +14,25 @@ from tests.helpers import SAMPLES
 
 UPLOAD_LIMIT = 64 * 1024
 
+# Set to run the API tests against a real server, e.g.
+# postgresql+psycopg://postgres:postgres@localhost:5432/test (its tables are dropped!)
+TEST_DATABASE_URL = os.environ.get("LOG_ANALYZER_TEST_DATABASE_URL")
+
 
 @pytest.fixture
 def db_url(tmp_path: Path) -> str:
-    """URL of an empty SQLite database file."""
-    return f"sqlite:///{tmp_path / 'test.db'}"
+    """URL of an empty database: a fresh SQLite file, or the emptied test server."""
+    if not TEST_DATABASE_URL:
+        return f"sqlite:///{tmp_path / 'test.db'}"
+
+    engine = make_engine(TEST_DATABASE_URL)
+    try:
+        existing = MetaData()
+        existing.reflect(engine)
+        existing.drop_all(engine)
+    finally:
+        engine.dispose()
+    return TEST_DATABASE_URL
 
 
 @pytest.fixture
