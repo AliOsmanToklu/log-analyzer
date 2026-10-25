@@ -1,13 +1,19 @@
 # log-analyzer
 
+[![CI](https://github.com/AliOsmanToklu/log-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/AliOsmanToklu/log-analyzer/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 [Türkçe](README.tr.md)
 
 A command-line tool that scans authentication logs for signs of attack:
 brute force bursts, successful logins that follow them, and slow username scans.
 It reads **Linux SSH logs** (`/var/log/auth.log`) and **Windows logon events** exported to CSV,
-normalizes both into one event format, and runs the same detectors over them.
+normalizes both into one typed event model, and runs the same detectors over them.
 
-Pure Python standard library — no runtime dependencies.
+- Pure Python standard library at runtime, fully type-checked (`mypy --strict`)
+- 100% test coverage, CI on Linux and Windows for Python 3.11–3.14
+- CSV report for spreadsheets, JSON report for other tools
 
 ## Example
 
@@ -37,12 +43,37 @@ Report saved: report.csv
 | 203.0.113.45 | POSSIBLE_COMPROMISE | CRITICAL | successful login as ahmet |
 | 198.51.100.7 | SLOW_SCAN | MEDIUM | 6 invalid user attempts |
 
+With `--output report.json` you get every detail, including timestamps and the parameters used:
+
+```json
+{
+  "source": "samples/auth.log",
+  "total_events": 66,
+  "parameters": { "threshold": 10, "window_seconds": 60, "scan_threshold": 3 },
+  "findings": [
+    { "ip": "203.0.113.45", "detection": "BRUTE_FORCE", "severity": "HIGH", "details": "40 failed attempts" },
+    ...
+  ],
+  "bruteforce": [
+    {
+      "ip": "203.0.113.45", "total_failed": 40, "max_in_window": 21,
+      "first_seen": "2026-10-25T11:00:00", "last_seen": "2026-10-25T11:01:57",
+      "users_tried": ["admin", "ahmet", "root", "test", "ubuntu"]
+    }
+  ],
+  "compromises": [
+    { "time": "2026-10-25T11:02:05", "type": "accepted", "user": "ahmet", "ip": "203.0.113.45" }
+  ],
+  "scanners": [ { "ip": "198.51.100.7", "count": 6, "users_tried": ["oracle"] } ]
+}
+```
+
 ## Installation
 
-Requires Python 3.10+.
+Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/<your-username>/log-analyzer.git
+git clone https://github.com/AliOsmanToklu/log-analyzer.git
 cd log-analyzer
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
@@ -52,17 +83,34 @@ pip install -e .
 ## Usage
 
 ```bash
-log-analyzer <file> [--threshold N] [--window SECONDS] [--output report.csv]
+log-analyzer <file> [options]
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
-| `file` | — | Log to analyze. `.csv` → Windows logon export, anything else → SSH auth log |
-| `--threshold` | `10` | Failed attempts inside one window that count as brute force |
-| `--window` | `60` | Sliding window length in seconds |
-| `--output` | `report.csv` | Where to write the CSV report (overwritten) |
+| `file` | — | Log to analyze |
+| `--format {auto,ssh,windows}` | `auto` | `auto` treats `.csv` as a Windows logon export and anything else as an SSH auth log |
+| `--threshold N` | `10` | Failed attempts inside one window that count as brute force |
+| `--window SECONDS` | `60` | Sliding window length |
+| `--scan-threshold N` | `3` | Invalid-user attempts from one IP that count as a slow scan |
+| `--year YEAR` | guessed | Year for classic syslog timestamps, which carry none |
+| `--output PATH` | `report.csv` | Report path; `.json` writes JSON, anything else CSV (overwritten) |
 
-`python -m log_analyzer ...` works too.
+`python -m log_analyzer ...` works too. Exit status is `0` on success and `2` on bad
+arguments or unreadable input, with a one-line error on stderr.
+
+### Supported SSH log lines
+
+| sshd message | Event |
+|---|---|
+| `Failed <method> for [invalid user] <user> from <ip>` | failed |
+| `Accepted <method> for <user> from <ip>` | accepted |
+| `Invalid user <user> from <ip>` | invalid |
+
+`<method>` is any auth method (`password`, `publickey`, `keyboard-interactive/pam`, ...).
+Both classic (`Oct 25 11:02:05`) and RFC 3339 (`2026-10-25T11:02:05.123+03:00`) timestamps are read.
+Classic timestamps have no year: it is guessed so the log does not end in the future, and
+Dec → Jan rollovers are followed. rsyslog's `message repeated N times: [ ... ]` lines count as N events.
 
 ### Exporting Windows logon events
 
@@ -82,32 +130,54 @@ Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get
   } | Export-Csv windows_events.csv -NoTypeInformation -Encoding UTF8
 ```
 
+Logons from local addresses (`-`, `127.0.0.1`, `::1`) are ignored.
+
 ## How detection works
 
 | Detection | Severity | Rule |
 |---|---|---|
-| `BRUTE_FORCE` | HIGH | An IP has ≥ `threshold` failed logins inside any `window`-second span (two-pointer sliding window over its sorted attempts) |
+| `BRUTE_FORCE` | HIGH | An IP has ≥ `threshold` failed logins inside any `window`-second span (two-pointer sliding window over its sorted attempts, O(n log n)) |
 | `POSSIBLE_COMPROMISE` | CRITICAL | A brute force IP later has a successful login |
-| `SLOW_SCAN` | MEDIUM | An IP tries ≥ 3 non-existent usernames, regardless of timing (SSH only) |
+| `SLOW_SCAN` | MEDIUM | An IP tries ≥ `scan-threshold` non-existent usernames, regardless of timing (SSH only) |
 
-Both parsers emit the same event shape, so detectors don't care where data came from:
+## Architecture
 
-```python
-{'time': datetime, 'type': 'failed' | 'accepted' | 'invalid', 'user': str, 'ip': str}
+```
+            ┌─ parsers/ssh.py ─────┐
+log file ───┤                      ├─► list[Event] ─► analysis.analyze() ─► AnalysisResult ─┬─► cli (console)
+            └─ parsers/windows.py ─┘                     │                                 └─► report (CSV / JSON)
+                                                    detectors.py
 ```
 
 ```
 src/log_analyzer/
-├── cli.py            # argument parsing, output, CSV report
+├── models.py         # Event, EventType, Finding, Severity (frozen dataclasses)
+├── parsers/
+│   ├── ssh.py        # sshd syslog lines: timestamps, year rollover, repeated messages
+│   └── windows.py    # Windows 4624/4625 CSV exports
 ├── detectors.py      # brute force / compromise / slow scan rules
-└── parsers/
-    ├── ssh.py        # regex parser for sshd syslog lines
-    └── windows.py    # CSV parser for Windows 4624/4625 events
+├── analysis.py       # runs all detectors, returns an AnalysisResult
+├── report.py         # CSV and JSON writers
+└── cli.py            # argument parsing and console output
+tests/                # pytest suite (100% branch coverage)
 scripts/              # synthetic data generators (fixed seeds)
 samples/              # generated sample logs
 ```
 
-## Sample data
+Parsing, detection and output are separate layers, so the same `analyze()` call can back
+other front ends (such as a web API) without touching the detection code.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest --cov          # tests with coverage
+ruff format .         # format
+ruff check .          # lint
+mypy                  # type check (strict)
+```
+
+CI runs the same checks on every push and pull request.
 
 `samples/` contains synthetic logs with a known attack scenario. Regenerate them with:
 
@@ -118,13 +188,14 @@ python scripts/generate_windows_log.py    # -> samples/windows_events.csv
 
 ## Roadmap
 
-- [ ] Test suite (pytest) and GitHub Actions CI with lint and type checks
-- [ ] Typed event model, configurable year and ISO 8601 syslog timestamps
-- [ ] More SSH patterns (public key logins, disconnects) and Windows logon types
-- [ ] JSON output
+- [x] Test suite and CI with lint and type checks
+- [x] Typed event model; year guessing and ISO 8601 syslog timestamps
+- [x] All SSH auth methods and rsyslog repeated messages
+- [x] JSON output
 - [ ] REST API (FastAPI) with stored analysis history
 - [ ] Docker image
 - [ ] Pluggable parsers/detectors and new rules (password spraying, distributed brute force)
+- [ ] Windows logon types and direct `.evtx` input
 
 ## License
 

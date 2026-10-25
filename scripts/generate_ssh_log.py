@@ -17,37 +17,38 @@ start = datetime(2026, 10, 25, 8, 0, 0)
 lines = []
 
 
-def fmt(t):
-    return t.strftime("%b %d %H:%M:%S")
+def sshd(t, message):
+    """Build one syslog line from sshd, keyed by its timestamp for sorting."""
+    return (t, f"{t.strftime('%b %d %H:%M:%S')} server sshd[1234]: {message}")
 
 
 # Normal successful logins
-for i in range(15):
+for _ in range(15):
     t = start + timedelta(minutes=random.randint(0, 600))
     user = random.choice(normal_users)
     ip = random.choice(normal_ips)
-    lines.append((t, f"{fmt(t)} server sshd[1234]: Accepted password for {user} from {ip} port 52000 ssh2"))
+    lines.append(sshd(t, f"Accepted password for {user} from {ip} port 52000 ssh2"))
 
 # Occasional wrong password (ordinary user mistakes)
-for i in range(4):
+for _ in range(4):
     t = start + timedelta(minutes=random.randint(0, 600))
     user = random.choice(normal_users)
     ip = random.choice(normal_ips)
-    lines.append((t, f"{fmt(t)} server sshd[1234]: Failed password for {user} from {ip} port 52000 ssh2"))
+    lines.append(sshd(t, f"Failed password for {user} from {ip} port 52000 ssh2"))
 
 # Attacker: many attempts in a short time, finally succeeds
 attack_start = start + timedelta(hours=3)
 for i in range(40):
     t = attack_start + timedelta(seconds=i * 3)
     user = random.choice(["root", "admin", "test", "ubuntu", "ahmet"])
-    lines.append((t, f"{fmt(t)} server sshd[1234]: Failed password for {user} from {attacker_ip} port 40000 ssh2"))
+    lines.append(sshd(t, f"Failed password for {user} from {attacker_ip} port 40000 ssh2"))
 t = attack_start + timedelta(seconds=125)
-lines.append((t, f"{fmt(t)} server sshd[1234]: Accepted password for ahmet from {attacker_ip} port 40000 ssh2"))
+lines.append(sshd(t, f"Accepted password for ahmet from {attacker_ip} port 40000 ssh2"))
 
 # Slow scanner: few attempts, invalid username
 for i in range(6):
     t = start + timedelta(minutes=30 * i)
-    lines.append((t, f"{fmt(t)} server sshd[1234]: Invalid user oracle from {scanner_ip} port 33000"))
+    lines.append(sshd(t, f"Invalid user oracle from {scanner_ip} port 33000"))
 
 lines.sort(key=lambda x: x[0])
 
