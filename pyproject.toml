@@ -55,6 +55,7 @@ addopts = "-ra"
 [tool.coverage.run]
 source = ["log_analyzer"]
 branch = true
+omit = ["*/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true
