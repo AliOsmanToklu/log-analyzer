@@ -93,7 +93,7 @@ Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get
 Both parsers emit the same event shape, so detectors don't care where data came from:
 
 ```python
-{'time': datetime, 'type': 'failed' | 'accepted' | 'invalid', 'user': str, 'ip': str}
+{"time": datetime, "type": "failed" | "accepted" | "invalid", "user": str, "ip": str}
 ```
 
 ```

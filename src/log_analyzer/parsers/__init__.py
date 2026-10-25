@@ -7,4 +7,4 @@ Every parser returns a list of dicts:
 from .ssh import parse_file
 from .windows import parse_windows_csv
 
-__all__ = ['parse_file', 'parse_windows_csv']
+__all__ = ["parse_file", "parse_windows_csv"]
