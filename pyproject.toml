@@ -29,8 +29,8 @@ classifiers = [
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
-    "ruff>=0.6",
-    "mypy>=1.11",
+    "ruff>=0.17,<0.18",
+    "mypy>=2.4,<3",
 ]
 
 [project.urls]
