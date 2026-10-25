@@ -24,6 +24,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--window", type=int, default=60, help="Sliding window length in seconds (default: 60)"
     )
     ap.add_argument("--output", default="report.csv", help="CSV report path (default: report.csv)")
+    ap.add_argument(
+        "--year",
+        type=int,
+        help="Year of a classic syslog file, which has none in its timestamps "
+        "(default: guessed so the log does not end in the future)",
+    )
     return ap
 
 
@@ -59,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.file.lower().endswith(".csv"):
         events = parse_windows_csv(args.file)
     else:
-        events = parse_file(args.file)
+        events = parse_file(args.file, args.year)
     print(f"=== Log Analysis: {args.file} ===")
 
     result = analyze(events, args.threshold, args.window)

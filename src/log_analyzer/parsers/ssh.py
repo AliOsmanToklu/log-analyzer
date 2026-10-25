@@ -1,23 +1,53 @@
 import re
-from datetime import datetime
+from collections.abc import Iterable, Iterator
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..models import Event, EventType
 
-# Patterns for the three kinds of sshd lines we care about
+# sshd messages we care about. The auth method (password, publickey,
+# keyboard-interactive/pam, ...) is matched generically, and usernames may be
+# empty ("Invalid user  from ...").
 PATTERNS = {
-    EventType.FAILED: re.compile(r"Failed password for (?:invalid user )?(\S+) from (\S+)"),
-    EventType.ACCEPTED: re.compile(r"Accepted password for (\S+) from (\S+)"),
-    EventType.INVALID: re.compile(r"Invalid user (\S+) from (\S+)"),
+    EventType.FAILED: re.compile(r"Failed \S+ for (?:invalid user )?(\S*) from (\S+)"),
+    EventType.ACCEPTED: re.compile(r"Accepted \S+ for (\S+) from (\S+)"),
+    EventType.INVALID: re.compile(r"Invalid user (\S*) from (\S+)"),
 }
 
+# rsyslog collapses identical lines: "message repeated 5 times: [ Failed password ...]"
+REPEATED = re.compile(r"message repeated (\d+) times: \[")
 
-def parse_line(line: str, year: int = 2026) -> Event | None:
-    """Convert one log line to an Event. Returns None for unrecognized lines."""
-    time_str = line[:15]  # e.g. "Oct 25 11:02:05"
+# Classic syslog lines have no year: "Oct 25 11:02:05 host ..."
+CLASSIC_FORMAT = "%Y %b %d %H:%M:%S"
+CLASSIC_LENGTH = 15
+
+# Logs are chronological, so a classic line more than a day older than the one
+# before it means the year rolled over (Dec 31 -> Jan 1)
+ROLLOVER = timedelta(days=1)
+
+
+def _is_iso(line: str) -> bool:
+    return line[:4].isdigit()
+
+
+def _timestamp(line: str, year: int) -> datetime | None:
+    """Read the leading timestamp: RFC 3339 (modern rsyslog/journald) or classic syslog."""
     try:
-        timestamp = datetime.strptime(f"{year} {time_str}", "%Y %b %d %H:%M:%S")
+        if _is_iso(line):
+            # Keep the wall-clock time as logged so both formats compare the same way
+            return datetime.fromisoformat(line.split(" ", 1)[0]).replace(tzinfo=None)
+        return datetime.strptime(f"{year} {line[:CLASSIC_LENGTH]}", CLASSIC_FORMAT)
     except ValueError:
+        return None
+
+
+def parse_line(line: str, year: int | None = None) -> Event | None:
+    """Convert one log line to an Event. Returns None for unrecognized lines.
+
+    `year` is used for classic syslog timestamps and defaults to the current year.
+    """
+    timestamp = _timestamp(line, datetime.now().year if year is None else year)
+    if timestamp is None:
         return None
 
     for event_type, pattern in PATTERNS.items():
@@ -27,11 +57,40 @@ def parse_line(line: str, year: int = 2026) -> Event | None:
     return None
 
 
-def parse_file(filepath: str | Path) -> list[Event]:
-    events: list[Event] = []
+def parse_lines(lines: Iterable[str], year: int) -> Iterator[Event]:
+    """Parse a log that starts in `year`, following year rollovers and expanding
+    repeated-message lines into one event per repetition."""
+    previous: datetime | None = None
+    for line in lines:
+        event = parse_line(line, year)
+        if event is None:
+            continue
+        if previous and previous - event.time > ROLLOVER and not _is_iso(line):
+            year += 1
+            event = parse_line(line, year)
+            if event is None:  # e.g. Feb 29 in a non-leap year
+                continue
+        previous = event.time
+
+        repeated = REPEATED.search(line)
+        for _ in range(int(repeated.group(1)) if repeated else 1):
+            yield event
+
+
+def parse_file(filepath: str | Path, year: int | None = None) -> list[Event]:
+    """Parse an SSH auth log.
+
+    Without `year`, the log is assumed to end in the current year, or in the
+    previous one if that would put its last line in the future.
+    """
     with open(filepath, encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            event = parse_line(line)
-            if event:
-                events.append(event)
+        lines = f.readlines()
+
+    if year is not None:
+        return list(parse_lines(lines, year))
+
+    now = datetime.now()
+    events = list(parse_lines(lines, now.year))
+    if events and events[-1].time > now + timedelta(days=1):
+        events = list(parse_lines(lines, now.year - 1))
     return events

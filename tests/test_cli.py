@@ -16,7 +16,7 @@ def test_ssh_log_end_to_end(
 ) -> None:
     report = tmp_path / "report.csv"
 
-    main([str(ssh_sample), "--output", str(report)])
+    main([str(ssh_sample), "--year", "2026", "--output", str(report)])
 
     out = capsys.readouterr().out
     assert "Total events: 66" in out
