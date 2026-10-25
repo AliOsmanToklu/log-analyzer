@@ -27,11 +27,17 @@ class Severity(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class Detection(StrEnum):
+    BRUTE_FORCE = "BRUTE_FORCE"
+    POSSIBLE_COMPROMISE = "POSSIBLE_COMPROMISE"
+    SLOW_SCAN = "SLOW_SCAN"
+
+
 @dataclass(frozen=True, slots=True)
 class Finding:
     """One row of the report: what was detected, for which IP, and how bad it is."""
 
     ip: str
-    detection: str
+    detection: Detection
     severity: Severity
     details: str

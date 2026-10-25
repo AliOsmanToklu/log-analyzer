@@ -10,7 +10,7 @@ from .detectors import (
     detect_compromise,
     detect_scanners,
 )
-from .models import Event, Finding, Severity
+from .models import Detection, Event, Finding, Severity
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,15 +26,20 @@ class AnalysisResult:
     def findings(self) -> list[Finding]:
         """Flatten the detector results into report rows."""
         rows = [
-            Finding(s.ip, "BRUTE_FORCE", Severity.HIGH, f"{s.total_failed} failed attempts")
+            Finding(s.ip, Detection.BRUTE_FORCE, Severity.HIGH, f"{s.total_failed} failed attempts")
             for s in self.bruteforce
         ]
         rows += [
-            Finding(e.ip, "POSSIBLE_COMPROMISE", Severity.CRITICAL, f"successful login as {e.user}")
+            Finding(
+                e.ip,
+                Detection.POSSIBLE_COMPROMISE,
+                Severity.CRITICAL,
+                f"successful login as {e.user}",
+            )
             for e in self.compromises
         ]
         rows += [
-            Finding(s.ip, "SLOW_SCAN", Severity.MEDIUM, f"{s.count} invalid user attempts")
+            Finding(s.ip, Detection.SLOW_SCAN, Severity.MEDIUM, f"{s.count} invalid user attempts")
             for s in self.scanners
         ]
         return rows

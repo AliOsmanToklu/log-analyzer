@@ -1,9 +1,12 @@
 import uuid
+from datetime import UTC, datetime, timedelta, timezone
 
+import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import Engine, func, inspect, select
+from sqlalchemy.exc import StatementError
 
 from log_analyzer.api.db import alembic_config, make_session_factory
 from log_analyzer.api.orm import AnalysisRecord, AnalysisStatus, Base, FindingRecord
@@ -60,6 +63,46 @@ def test_deleting_an_analysis_deletes_its_findings(engine: Engine) -> None:
         session.commit()
 
         assert session.scalar(select(func.count()).select_from(FindingRecord)) == 0
+
+
+def test_timestamps_come_back_as_utc(engine: Engine) -> None:
+    sessions = make_session_factory(engine)
+    istanbul = timezone(timedelta(hours=3))
+    with sessions() as session:
+        record = AnalysisRecord(
+            filename="a.log",
+            format="ssh",
+            threshold=1,
+            window_seconds=1,
+            scan_threshold=1,
+            completed_at=datetime(2026, 10, 25, 15, 0, tzinfo=istanbul),
+        )
+        session.add(record)
+        session.commit()
+        analysis_id = record.id
+
+    with sessions() as session:
+        stored = session.get_one(AnalysisRecord, analysis_id)
+
+    assert stored.completed_at == datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
+    assert stored.completed_at.tzinfo is UTC
+    assert stored.created_at.tzinfo is UTC
+
+
+def test_naive_timestamps_are_rejected(engine: Engine) -> None:
+    with make_session_factory(engine)() as session:
+        session.add(
+            AnalysisRecord(
+                filename="a.log",
+                format="ssh",
+                threshold=1,
+                window_seconds=1,
+                scan_threshold=1,
+                completed_at=datetime(2026, 10, 25, 15, 0),
+            )
+        )
+        with pytest.raises(StatementError, match="naive datetime"):
+            session.commit()
 
 
 def test_settings_defaults() -> None:

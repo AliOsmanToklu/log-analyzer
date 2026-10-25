@@ -5,12 +5,33 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, Uuid
+from sqlalchemy import JSON, DateTime, Dialect, ForeignKey, String, Text, TypeDecorator, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """Timezone-aware UTC datetimes on every database.
+
+    SQLite has no timezone support and hands back naive values, which would
+    reach API clients without an offset; PostgreSQL keeps the offset.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError("naive datetime; use timezone-aware UTC datetimes")
+        return value.astimezone(UTC) if value is not None else None
+
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class Base(DeclarativeBase):
@@ -35,10 +56,8 @@ class AnalysisRecord(Base):
     filename: Mapped[str] = mapped_column(String(255))
     format: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(16), default=AnalysisStatus.PENDING, index=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, index=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     threshold: Mapped[int]
     window_seconds: Mapped[int]
