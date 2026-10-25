@@ -6,14 +6,16 @@
 
 [Türkçe](README.tr.md)
 
-A command-line tool that scans authentication logs for signs of attack:
-brute force bursts, successful logins that follow them, and slow username scans.
-It reads **Linux SSH logs** (`/var/log/auth.log`) and **Windows logon events** exported to CSV,
-normalizes both into one typed event model, and runs the same detectors over them.
+Scans authentication logs for signs of attack: brute force bursts, successful logins
+that follow them, and slow username scans. It reads **Linux SSH logs** (`/var/log/auth.log`)
+and **Windows logon events** exported to CSV, normalizes both into one typed event model,
+and runs the same detectors over them — from a **command-line tool** or a **REST API**.
 
-- Pure Python standard library at runtime, fully type-checked (`mypy --strict`)
-- 100% test coverage, CI on Linux and Windows for Python 3.11–3.14
-- CSV report for spreadsheets, JSON report for other tools
+- **CLI**: pure standard library, CSV report for spreadsheets, JSON report for other tools
+- **REST API**: FastAPI, background analysis, findings stored in PostgreSQL or SQLite
+  and searchable across uploads, OpenAPI docs, Docker Compose stack
+- Fully type-checked (`mypy --strict`), 99% branch coverage, CI on Linux and Windows
+  for Python 3.11–3.14, against PostgreSQL, and on the Docker image
 
 ## Example
 
@@ -77,10 +79,11 @@ git clone https://github.com/AliOsmanToklu/log-analyzer.git
 cd log-analyzer
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e .
+pip install -e .                 # CLI only, no dependencies
+pip install -e ".[api]"          # plus the REST API (add ",postgres" for PostgreSQL)
 ```
 
-## Usage
+## CLI usage
 
 ```bash
 log-analyzer <file> [options]
@@ -132,6 +135,69 @@ Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get
 
 Logons from local addresses (`-`, `127.0.0.1`, `::1`) are ignored.
 
+## REST API
+
+### Run it
+
+With Docker (API + PostgreSQL):
+
+```bash
+docker compose up --build
+# Swagger UI: http://localhost:8000/docs
+```
+
+Or locally with SQLite:
+
+```bash
+pip install -e ".[api]"
+log-analyzer-api serve          # migrates the database, then serves on 127.0.0.1:8000
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/analyses` | Upload a log (multipart `file`, optional `format`, `threshold`, `window_seconds`, `scan_threshold`, `year`). Returns `202 Accepted` and a `Location` header; analysis runs in the background |
+| `GET` | `/analyses` | List analyses, newest first (`limit`, `offset`, `status`) |
+| `GET` | `/analyses/{id}` | Status, parameters and every finding of one analysis |
+| `DELETE` | `/analyses/{id}` | Delete an analysis and its findings |
+| `GET` | `/findings` | Search findings across all analyses (`ip`, `severity`, `detection`, `limit`, `offset`) |
+| `GET` | `/health` | Liveness and database check (`503` if the database is unreachable) |
+
+Errors use standard status codes: `404` unknown id, `413` upload over the size limit,
+`422` invalid parameters. A log that cannot be parsed (for example a CSV that is not a
+Windows export) still returns `202`; the analysis then ends with `status: "failed"` and an `error`.
+
+### Example
+
+```console
+$ curl -F file=@samples/auth.log -F year=2026 http://localhost:8000/analyses
+{"id":"4a60b9a6-65a1-4835-8a30-403331e3c851","filename":"auth.log","format":"ssh","status":"pending",
+ "created_at":"2026-10-25T12:49:21.876865Z","completed_at":null,"total_events":null,"error":null,
+ "parameters":{"threshold":10,"window_seconds":60,"scan_threshold":3,"year":2026}}
+
+$ curl http://localhost:8000/analyses/4a60b9a6-65a1-4835-8a30-403331e3c851
+{"id":"4a60b9a6-...","status":"completed","total_events":66,
+ "findings":[{"ip":"203.0.113.45","detection":"BRUTE_FORCE","severity":"HIGH","details":"40 failed attempts"}, ...],
+ "bruteforce":[...], "compromises":[...], "scanners":[...], ...}
+
+$ curl "http://localhost:8000/findings?severity=CRITICAL"
+{"items":[{"ip":"203.0.113.45","detection":"POSSIBLE_COMPROMISE","severity":"CRITICAL",
+           "details":"successful login as ahmet","analysis_id":"4a60b9a6-...","filename":"auth.log",
+           "analyzed_at":"2026-10-25T12:49:21.876865Z"}],
+ "total":1,"limit":20,"offset":0}
+```
+
+### Configuration
+
+| Environment variable | Default | Meaning |
+|---|---|---|
+| `LOG_ANALYZER_DATABASE_URL` | `sqlite:///log_analyzer.db` | SQLAlchemy URL, e.g. `postgresql+psycopg://user:pass@host/db` |
+| `LOG_ANALYZER_MAX_UPLOAD_MB` | `20` | Largest accepted upload |
+
+`log-analyzer-api migrate` applies database migrations without starting the server;
+`serve --no-migrate` starts it without migrating.
+
 ## How detection works
 
 | Detection | Severity | Rule |
@@ -143,29 +209,54 @@ Logons from local addresses (`-`, `127.0.0.1`, `::1`) are ignored.
 ## Architecture
 
 ```
-            ┌─ parsers/ssh.py ─────┐
-log file ───┤                      ├─► list[Event] ─► analysis.analyze() ─► AnalysisResult ─┬─► cli (console)
-            └─ parsers/windows.py ─┘                     │                                 └─► report (CSV / JSON)
-                                                    detectors.py
+            ┌─ parsers/ssh.py ─────┐                                                       ┌─► cli (console)
+log lines ──┤                      ├─► list[Event] ─► analysis.analyze() ─► AnalysisResult ─┼─► report (CSV / JSON)
+            └─ parsers/windows.py ─┘                     │                                  └─► api.service ─► database
+                                                    detectors.py                                    ▲
+                                                                                      api.app (HTTP routes)
 ```
 
 ```
 src/log_analyzer/
-├── models.py         # Event, EventType, Finding, Severity (frozen dataclasses)
+├── models.py         # Event, Finding, EventType, Severity, Detection (frozen dataclasses, enums)
 ├── parsers/
 │   ├── ssh.py        # sshd syslog lines: timestamps, year rollover, repeated messages
 │   └── windows.py    # Windows 4624/4625 CSV exports
 ├── detectors.py      # brute force / compromise / slow scan rules
 ├── analysis.py       # runs all detectors, returns an AnalysisResult
 ├── report.py         # CSV and JSON writers
-└── cli.py            # argument parsing and console output
-tests/                # pytest suite (100% branch coverage)
+├── cli.py            # argument parsing and console output
+└── api/
+    ├── app.py        # FastAPI app factory, routes, upload limits
+    ├── schemas.py    # Pydantic response models (drive the OpenAPI docs)
+    ├── service.py    # use cases: create/run/list/search, no HTTP
+    ├── orm.py        # SQLAlchemy 2 models: analyses, findings
+    ├── db.py         # engine/session setup, Alembic upgrade
+    ├── settings.py   # configuration from environment variables
+    └── migrations/   # Alembic migrations, shipped inside the package
+tests/                # pytest suite; tests/api also runs against PostgreSQL in CI
 scripts/              # synthetic data generators (fixed seeds)
 samples/              # generated sample logs
 ```
 
-Parsing, detection and output are separate layers, so the same `analyze()` call can back
-other front ends (such as a web API) without touching the detection code.
+### Design decisions
+
+- **One detection core, two front ends.** Parsing, detection and output are separate layers;
+  the CLI and the API both call the same `analyze()`, and the API's HTTP routes only translate
+  requests into calls to `api.service`.
+- **The CLI stays dependency-free.** Web, database and migration libraries live in the
+  optional `api` extra, so `pip install log-analyzer` pulls in nothing.
+- **Asynchronous by contract.** `POST /analyses` returns `202 Accepted` immediately and the
+  client polls the resource. Today the work runs in FastAPI background tasks; the same contract
+  allows moving it to a queue worker later without changing clients. A background failure never
+  leaves an analysis stuck in `pending`.
+- **Findings are rows, not just a blob.** The full result is stored as JSON for the detail
+  endpoint, and each finding is also a row indexed by IP and severity, so "has this IP shown up
+  anywhere?" is a single SQL query.
+- **Uploaded logs are not stored.** Logs contain usernames and addresses; only findings are kept.
+- **Schema changes go through migrations.** Alembic migrations ship in the package (the Docker
+  image migrates itself on start), and a test fails if the models and migrations disagree.
+- **Timestamps are always UTC with an offset**, including on SQLite, which drops time zones.
 
 ## Development
 
@@ -175,9 +266,15 @@ pytest --cov          # tests with coverage
 ruff format .         # format
 ruff check .          # lint
 mypy                  # type check (strict)
+
+# API tests against PostgreSQL instead of SQLite (the database's tables are dropped!)
+docker run -d --rm -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=test postgres:17-alpine
+pip install -e ".[dev,postgres]"
+LOG_ANALYZER_TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/test pytest tests/api
 ```
 
-CI runs the same checks on every push and pull request.
+CI runs lint and type checks, the test suite on Python 3.11–3.14 (Linux) and 3.14 (Windows),
+the API tests against PostgreSQL, and builds and exercises the Docker image.
 
 `samples/` contains synthetic logs with a known attack scenario. Regenerate them with:
 
@@ -192,10 +289,11 @@ python scripts/generate_windows_log.py    # -> samples/windows_events.csv
 - [x] Typed event model; year guessing and ISO 8601 syslog timestamps
 - [x] All SSH auth methods and rsyslog repeated messages
 - [x] JSON output
-- [ ] REST API (FastAPI) with stored analysis history
-- [ ] Docker image
+- [x] REST API (FastAPI) with stored analysis history and cross-analysis search
+- [x] Docker image and Compose stack with PostgreSQL
 - [ ] Pluggable parsers/detectors and new rules (password spraying, distributed brute force)
 - [ ] Windows logon types and direct `.evtx` input
+- [ ] Small web UI
 
 ## License
 

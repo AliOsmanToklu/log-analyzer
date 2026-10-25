@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .analysis import AnalysisResult, analyze
 from .models import Event
-from .parsers import parse_file, parse_windows_csv
+from .parsers import detect_format, parse_file, parse_windows_csv
 from .report import write_csv, write_json
 
 EXIT_OK = 0
@@ -69,9 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_events(path: str, fmt: str, year: int | None) -> list[Event]:
-    if fmt == "auto":
-        fmt = "windows" if path.lower().endswith(".csv") else "ssh"
-    if fmt == "windows":
+    if (detect_format(path) if fmt == "auto" else fmt) == "windows":
         return parse_windows_csv(path)
     return parse_file(path, year)
 

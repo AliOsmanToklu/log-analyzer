@@ -1,5 +1,5 @@
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -77,15 +77,12 @@ def parse_lines(lines: Iterable[str], year: int) -> Iterator[Event]:
             yield event
 
 
-def parse_file(filepath: str | Path, year: int | None = None) -> list[Event]:
-    """Parse an SSH auth log.
+def parse_ssh_lines(lines: Sequence[str], year: int | None = None) -> list[Event]:
+    """Parse the lines of an SSH auth log.
 
     Without `year`, the log is assumed to end in the current year, or in the
     previous one if that would put its last line in the future.
     """
-    with open(filepath, encoding="utf-8", errors="ignore") as f:
-        lines = f.readlines()
-
     if year is not None:
         return list(parse_lines(lines, year))
 
@@ -94,3 +91,9 @@ def parse_file(filepath: str | Path, year: int | None = None) -> list[Event]:
     if events and events[-1].time > now + timedelta(days=1):
         events = list(parse_lines(lines, now.year - 1))
     return events
+
+
+def parse_file(filepath: str | Path, year: int | None = None) -> list[Event]:
+    """Parse an SSH auth log file; see `parse_ssh_lines`."""
+    with open(filepath, encoding="utf-8", errors="ignore") as f:
+        return parse_ssh_lines(f.readlines(), year)

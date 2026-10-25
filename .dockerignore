@@ -1,0 +1,9 @@
+# Only pyproject.toml, README.md, LICENSE and src/ are needed to build the image.
+# Keep everything else out, above all real log exports.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!src/
+**/__pycache__
+**/*.py[cod]

@@ -45,6 +45,12 @@ def _json_default(value: object) -> str:
     raise TypeError(f"{type(value).__name__} is not JSON serializable")
 
 
+def to_json_data(result: AnalysisResult, source: str) -> dict[str, Any]:
+    """Like `to_dict`, with datetimes as ISO 8601 strings (what the JSON report contains)."""
+    data: dict[str, Any] = json.loads(json.dumps(to_dict(result, source), default=_json_default))
+    return data
+
+
 def write_json(result: AnalysisResult, source: str, path: str | Path) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(to_dict(result, source), f, indent=2, ensure_ascii=False, default=_json_default)

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from log_analyzer.analysis import analyze
-from log_analyzer.models import Finding, Severity
+from log_analyzer.models import Detection, Finding, Severity
 from log_analyzer.parsers import parse_file, parse_windows_csv
 
 
@@ -10,11 +10,14 @@ def test_ssh_sample_findings(ssh_sample: Path) -> None:
 
     assert result.total_events == 66
     assert result.findings() == [
-        Finding("203.0.113.45", "BRUTE_FORCE", Severity.HIGH, "40 failed attempts"),
+        Finding("203.0.113.45", Detection.BRUTE_FORCE, Severity.HIGH, "40 failed attempts"),
         Finding(
-            "203.0.113.45", "POSSIBLE_COMPROMISE", Severity.CRITICAL, "successful login as ahmet"
+            "203.0.113.45",
+            Detection.POSSIBLE_COMPROMISE,
+            Severity.CRITICAL,
+            "successful login as ahmet",
         ),
-        Finding("198.51.100.7", "SLOW_SCAN", Severity.MEDIUM, "6 invalid user attempts"),
+        Finding("198.51.100.7", Detection.SLOW_SCAN, Severity.MEDIUM, "6 invalid user attempts"),
     ]
     assert result.bruteforce[0].max_in_window == 21
 
