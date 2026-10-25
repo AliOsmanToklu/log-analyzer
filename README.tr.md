@@ -6,14 +6,17 @@
 
 [English](README.md)
 
-Kimlik doğrulama loglarında saldırı izlerini arayan bir komut satırı aracı. Şunları tespit eder:
-kısa sürede yoğun brute force denemeleri, bunların ardından gelen başarılı girişler ve yavaş kullanıcı adı taramaları.
+Kimlik doğrulama loglarında saldırı izlerini arar: kısa sürede yoğun brute force denemeleri,
+bunların ardından gelen başarılı girişler ve yavaş kullanıcı adı taramaları.
 **Linux SSH loglarını** (`/var/log/auth.log`) ve CSV'ye aktarılmış **Windows oturum açma olaylarını** okur,
-ikisini tipli tek bir olay modeline çevirir ve aynı dedektörlerden geçirir.
+ikisini tipli tek bir olay modeline çevirir ve aynı dedektörlerden geçirir. **Komut satırı aracı** ve
+**REST API** olarak kullanılabilir.
 
-- Çalışma zamanında yalnızca Python standart kütüphanesi; tamamen tip kontrollü (`mypy --strict`)
-- %100 test kapsamı; Linux ve Windows üzerinde Python 3.11–3.14 için CI
-- Tablolar için CSV rapor, diğer araçlar için JSON rapor
+- **CLI**: yalnızca standart kütüphane; tablolar için CSV, diğer araçlar için JSON rapor
+- **REST API**: FastAPI, arka planda analiz, PostgreSQL veya SQLite'ta saklanan ve tüm yüklemeler
+  arasında aranabilen bulgular, OpenAPI dokümanı, Docker Compose
+- Tamamen tip kontrollü (`mypy --strict`), %99 dal kapsamı; Linux/Windows'ta Python 3.11–3.14,
+  PostgreSQL ve Docker imajı için CI
 
 ## Örnek
 
@@ -47,7 +50,8 @@ git clone https://github.com/AliOsmanToklu/log-analyzer.git
 cd log-analyzer
 python -m venv .venv
 .venv\Scripts\activate           # Linux/macOS: source .venv/bin/activate
-pip install -e .
+pip install -e .                 # yalnızca CLI, bağımlılık yok
+pip install -e ".[api]"          # REST API ile birlikte (PostgreSQL için ",postgres" ekleyin)
 ```
 
 ## Kullanım
@@ -81,6 +85,37 @@ rsyslog'un `message repeated N times: [ ... ]` satırları N olay olarak sayıl�
 
 Windows olaylarını dışa aktarmak için gereken PowerShell komutu [İngilizce README](README.md#exporting-windows-logon-events)'de yer alır.
 
+## REST API
+
+Docker ile (API + PostgreSQL):
+
+```bash
+docker compose up --build
+# Swagger arayüzü: http://localhost:8000/docs
+```
+
+Ya da yerelde SQLite ile:
+
+```bash
+pip install -e ".[api]"
+log-analyzer-api serve          # veritabanını migrate eder, 127.0.0.1:8000'de çalışır
+```
+
+| Metot | Yol | Açıklama |
+|---|---|---|
+| `POST` | `/analyses` | Log yükle (multipart `file`; isteğe bağlı `format`, `threshold`, `window_seconds`, `scan_threshold`, `year`). Hemen `202 Accepted` ve `Location` başlığı döner; analiz arka planda çalışır |
+| `GET` | `/analyses` | Analizleri yeniden eskiye listele (`limit`, `offset`, `status`) |
+| `GET` | `/analyses/{id}` | Bir analizin durumu, parametreleri ve tüm bulguları |
+| `DELETE` | `/analyses/{id}` | Analizi ve bulgularını sil |
+| `GET` | `/findings` | Tüm analizlerde bulgu ara (`ip`, `severity`, `detection`, `limit`, `offset`) |
+| `GET` | `/health` | Canlılık ve veritabanı kontrolü (veritabanına ulaşılamazsa `503`) |
+
+Hatalar standart durum kodlarıyla döner: `404` bilinmeyen id, `413` boyut sınırını aşan yükleme,
+`422` geçersiz parametre. Ayrıştırılamayan bir log da `202` alır; analiz `status: "failed"` ve bir `error` ile biter.
+
+Yapılandırma: `LOG_ANALYZER_DATABASE_URL` (varsayılan `sqlite:///log_analyzer.db`) ve
+`LOG_ANALYZER_MAX_UPLOAD_MB` (varsayılan `20`). `curl` örnekleri [İngilizce README](README.md#example-1)'de.
+
 ## Tespit Kuralları
 
 | Tespit | Önem | Kural |
@@ -91,9 +126,22 @@ Windows olaylarını dışa aktarmak için gereken PowerShell komutu [İngilizce
 
 ## Mimari
 
-Ayrıştırma (`parsers/`), tespit (`detectors.py`, `analysis.py`) ve çıktı (`cli.py`, `report.py`) ayrı katmanlardır.
-Bu sayede aynı `analyze()` çağrısı, tespit koduna dokunmadan bir web API gibi başka arayüzlerde de kullanılabilir.
-Ayrıntılı modül yapısı [İngilizce README](README.md#architecture)'de.
+Ayrıştırma (`parsers/`), tespit (`detectors.py`, `analysis.py`) ve çıktı (`cli.py`, `report.py`, `api/`) ayrı katmanlardır.
+CLI ve API aynı `analyze()` çağrısını kullanır. Ayrıntılı modül yapısı [İngilizce README](README.md#architecture)'de.
+
+### Tasarım kararları
+
+- **Tek tespit çekirdeği, iki arayüz.** HTTP route'ları yalnızca istekleri `api.service` çağrılarına çevirir.
+- **CLI bağımlılıksız kalır.** Web, veritabanı ve migration kütüphaneleri isteğe bağlı `api` ekindedir.
+- **Asenkron sözleşme.** `POST /analyses` hemen `202` döner, istemci kaynağı sorgular. İş bugün FastAPI
+  arka plan görevlerinde çalışır; aynı sözleşme ileride istemcileri değiştirmeden bir kuyruk işçisine taşınabilir.
+  Arka plan hatası bir analizi asla `pending`'de bırakmaz.
+- **Bulgular ayrıca satır olarak saklanır.** IP ve önem derecesine göre indeksli olduğundan
+  "bu IP başka bir yerde görüldü mü?" tek bir SQL sorgusudur.
+- **Yüklenen loglar saklanmaz.** Loglar kullanıcı adı ve adres içerir; yalnızca bulgular tutulur.
+- **Şema değişiklikleri migration ile yapılır.** Alembic migration'ları paketle gelir (Docker imajı açılışta
+  kendini migrate eder); modeller ile migration'lar uyuşmazsa bir test başarısız olur.
+- **Zaman damgaları her zaman UTC ve ofsetlidir**; zaman dilimi tutmayan SQLite'ta bile.
 
 ## Geliştirme
 
@@ -105,7 +153,11 @@ ruff check .          # lint
 mypy                  # tip kontrolü (strict)
 ```
 
-CI aynı kontrolleri her push ve pull request'te çalıştırır.
+API testlerini SQLite yerine PostgreSQL'e karşı çalıştırmak için `LOG_ANALYZER_TEST_DATABASE_URL`
+verin (o veritabanının tabloları silinir!); ayrıntılar [İngilizce README](README.md#development)'de.
+
+CI lint ve tip kontrollerini, Python 3.11–3.14 (Linux) ve 3.14 (Windows) testlerini, PostgreSQL'e karşı
+API testlerini çalıştırır; Docker imajını da derleyip dener.
 
 `samples/` klasöründe bilinen bir saldırı senaryosu içeren sentetik loglar bulunur:
 
