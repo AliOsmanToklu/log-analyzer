@@ -34,7 +34,7 @@ Report saved: report.csv
 Python 3.10+ gerekir.
 
 ```bash
-git clone https://github.com/<kullanici-adiniz>/log-analyzer.git
+git clone https://github.com/AliOsmanToklu/log-analyzer.git
 cd log-analyzer
 python -m venv .venv
 .venv\Scripts\activate           # Linux/macOS: source .venv/bin/activate

@@ -42,7 +42,7 @@ Report saved: report.csv
 Requires Python 3.10+.
 
 ```bash
-git clone https://github.com/<your-username>/log-analyzer.git
+git clone https://github.com/AliOsmanToklu/log-analyzer.git
 cd log-analyzer
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
